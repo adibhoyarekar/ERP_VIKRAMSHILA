@@ -949,26 +949,66 @@ $$;
 GRANT EXECUTE ON FUNCTION public.verify_and_record_attendance(TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, UUID) TO authenticated, anon;
 
 
--- 4.12 Delete Old Attendance Photos RPC (Admin Only)
+-- 4.12 Auto Purge Attendance Photos & URLs Older Than 24 Hours Strictly
 CREATE OR REPLACE FUNCTION public.delete_old_attendance_photos()
-RETURNS void
+RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = storage, public, pg_temp
+SET search_path = public, storage, pg_temp
 AS $$
+DECLARE
+  v_deleted_storage_count INTEGER := 0;
+  v_updated_records_count INTEGER := 0;
 BEGIN
-  IF public.get_auth_user_role() NOT IN ('superadmin', 'super_admin', 'admin') THEN
-    RAISE EXCEPTION 'Unauthorized: Only administrators are permitted to purge old attendance photos.';
-  END IF;
+  -- 1. Delete all photo files from attendance_photos bucket created more than 24 hours ago
+  WITH deleted_files AS (
+    DELETE FROM storage.objects 
+    WHERE bucket_id = 'attendance_photos' 
+      AND created_at < NOW() - INTERVAL '24 hours'
+    RETURNING 1
+  )
+  SELECT COUNT(*) INTO v_deleted_storage_count FROM deleted_files;
 
-  DELETE FROM storage.objects 
-  WHERE bucket_id = 'attendance_photos' 
-  AND created_at < NOW() - INTERVAL '24 hours';
+  -- 2. Clear photo references from attendance_records (retains punch times & status, purges expired photo references)
+  WITH updated_records AS (
+    UPDATE public.attendance_records
+    SET check_in_photo_url = NULL,
+        check_out_photo_url = NULL
+    WHERE created_at < NOW() - INTERVAL '24 hours'
+      AND (check_in_photo_url IS NOT NULL OR check_out_photo_url IS NOT NULL)
+    RETURNING 1
+  )
+  SELECT COUNT(*) INTO v_updated_records_count FROM updated_records;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'deleted_storage_files', v_deleted_storage_count,
+    'cleared_records', v_updated_records_count,
+    'timestamp', NOW()
+  );
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.delete_old_attendance_photos() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.delete_old_attendance_photos() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.delete_old_attendance_photos() TO authenticated, anon;
+
+-- Auto-trigger 24-hour purge on every attendance punch
+CREATE OR REPLACE FUNCTION public.trigger_purge_old_attendance_photos()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, storage, pg_temp
+AS $$
+BEGIN
+  PERFORM public.delete_old_attendance_photos();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trigger_auto_purge_attendance_photos ON public.attendance_records;
+CREATE TRIGGER trigger_auto_purge_attendance_photos
+AFTER INSERT OR UPDATE ON public.attendance_records
+FOR EACH STATEMENT
+EXECUTE FUNCTION public.trigger_purge_old_attendance_photos();
 
 
 -- 4.13 Cascade Delete Student RPC

@@ -153,8 +153,6 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.delete_student_cascade(UUID, TEXT) TO authenticated, anon;
-
 -- 8. Add Tables to Realtime Publication with Full Replica Identity
 ALTER TABLE public.students REPLICA IDENTITY FULL;
 ALTER TABLE public.scholarship_records REPLICA IDENTITY FULL;
@@ -190,4 +188,65 @@ BEGIN
   END;
 END $$;
 
-SELECT '✅ Student cascade deletion, storage delete permissions, and realtime sync configured successfully!' AS status;
+-- 9. Auto Purge Attendance Photos & Database URLs Older Than 24 Hours Strictly
+CREATE OR REPLACE FUNCTION public.delete_old_attendance_photos()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, storage, pg_temp
+AS $$
+DECLARE
+  v_deleted_storage_count INTEGER := 0;
+  v_updated_records_count INTEGER := 0;
+BEGIN
+  -- 1. Delete all photo files from attendance_photos bucket created more than 24 hours ago
+  WITH deleted_files AS (
+    DELETE FROM storage.objects 
+    WHERE bucket_id = 'attendance_photos' 
+      AND created_at < NOW() - INTERVAL '24 hours'
+    RETURNING 1
+  )
+  SELECT COUNT(*) INTO v_deleted_storage_count FROM deleted_files;
+
+  -- 2. Clear photo references from attendance_records (retains punch times & status, purges expired photo references)
+  WITH updated_records AS (
+    UPDATE public.attendance_records
+    SET check_in_photo_url = NULL,
+        check_out_photo_url = NULL
+    WHERE created_at < NOW() - INTERVAL '24 hours'
+      AND (check_in_photo_url IS NOT NULL OR check_out_photo_url IS NOT NULL)
+    RETURNING 1
+  )
+  SELECT COUNT(*) INTO v_updated_records_count FROM updated_records;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'deleted_storage_files', v_deleted_storage_count,
+    'cleared_records', v_updated_records_count,
+    'timestamp', NOW()
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.delete_old_attendance_photos() TO authenticated, anon;
+
+-- Auto-trigger 24-hour purge on every attendance punch
+CREATE OR REPLACE FUNCTION public.trigger_purge_old_attendance_photos()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, storage, pg_temp
+AS $$
+BEGIN
+  PERFORM public.delete_old_attendance_photos();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trigger_auto_purge_attendance_photos ON public.attendance_records;
+CREATE TRIGGER trigger_auto_purge_attendance_photos
+AFTER INSERT OR UPDATE ON public.attendance_records
+FOR EACH STATEMENT
+EXECUTE FUNCTION public.trigger_purge_old_attendance_photos();
+
+SELECT '✅ Student cascade deletion, storage delete permissions, 24h attendance photo auto-purge, and realtime sync configured successfully!' AS status;

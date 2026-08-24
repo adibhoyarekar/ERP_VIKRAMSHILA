@@ -652,10 +652,13 @@ function StudentsTab({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [studentsToDelete, setStudentsToDelete] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
+  const [deletedCount, setDeletedCount] = useState(1);
 
   const handleDeleteStudents = async (ids: string[]) => {
     if (!ids || ids.length === 0) return;
     setIsDeleting(true);
+    setDeletedCount(ids.length);
 
     const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim());
 
@@ -666,9 +669,9 @@ function StudentsTab({
     const enrollmentIds = Array.from(new Set(studentsToDel.map(s => s.enrollmentId).filter(Boolean)));
     const studentNames = Array.from(new Set(studentsToDel.map(s => s.name).filter(Boolean)));
 
-    // 2. Optimistic UI update: immediately close modal, update list, and show success toast
+    // 2. Optimistic UI update: close confirmation modal, update lists, and show beautiful SuccessAnimation modal
     setIsDeleteModalOpen(false);
-    setShowSuccessToast(true);
+    setShowDeleteSuccessModal(true);
 
     const remainingStudents = students.filter(
       s => !targetIds.includes(s.id) && !(s.enrollmentId && enrollmentIds.includes(s.enrollmentId))
@@ -695,10 +698,10 @@ function StudentsTab({
     }
 
     setTimeout(() => {
-      setShowSuccessToast(false);
+      setShowDeleteSuccessModal(false);
       setStudentsToDelete([]);
       setIsDeleting(false);
-    }, 2500);
+    }, 2200);
 
     try {
       // 3. Collect storage files for deletion
@@ -1171,10 +1174,28 @@ function StudentsTab({
     );
   };
 
+  const renderDeleteSuccessModal = () => {
+    if (!showDeleteSuccessModal) return null;
+    return createPortal(
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center relative z-[100000] border border-slate-100 animate-in zoom-in-95 duration-200">
+          <SuccessAnimation
+            title="Deletion Successful!"
+            message={`Successfully deleted ${deletedCount} student${deletedCount > 1 ? 's' : ''}.`}
+            subMessage="Student record and storage files were permanently removed."
+            color="rose"
+          />
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
   if (viewingStudent) {
     return (
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
         {renderDeleteModal()}
+        {renderDeleteSuccessModal()}
         <SuccessToast show={showSuccessToast} message="Student deleted successfully!" />
         <div className="flex items-center justify-between mb-6 border-b border-slate-200 pb-4">
           <div>
@@ -1278,8 +1299,9 @@ function StudentsTab({
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="relative">
-      <Loader show={isLoading || isDeleting} fullScreen={false} />
+      <Loader show={isLoading} fullScreen={false} />
       {renderDeleteModal()}
+      {renderDeleteSuccessModal()}
       <SuccessToast show={showSuccessToast} message="Student deleted successfully!" />
 
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
