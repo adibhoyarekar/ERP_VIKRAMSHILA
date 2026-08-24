@@ -652,7 +652,6 @@ function StudentsTab({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [studentsToDelete, setStudentsToDelete] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteSuccessAnimation, setShowDeleteSuccessAnimation] = useState(false);
 
   const handleDeleteStudents = async (ids: string[]) => {
     if (!ids || ids.length === 0) return;
@@ -667,9 +666,9 @@ function StudentsTab({
     const enrollmentIds = Array.from(new Set(studentsToDel.map(s => s.enrollmentId).filter(Boolean)));
     const studentNames = Array.from(new Set(studentsToDel.map(s => s.name).filter(Boolean)));
 
-    // 2. Optimistic UI update: immediately close modal, update list, and show success animation
+    // 2. Optimistic UI update: immediately close modal, update list, and show success toast
     setIsDeleteModalOpen(false);
-    setShowDeleteSuccessAnimation(true);
+    setShowSuccessToast(true);
 
     const remainingStudents = students.filter(
       s => !targetIds.includes(s.id) && !(s.enrollmentId && enrollmentIds.includes(s.enrollmentId))
@@ -696,10 +695,10 @@ function StudentsTab({
     }
 
     setTimeout(() => {
-      setShowDeleteSuccessAnimation(false);
+      setShowSuccessToast(false);
       setStudentsToDelete([]);
       setIsDeleting(false);
-    }, 2200);
+    }, 2500);
 
     try {
       // 3. Collect storage files for deletion
@@ -1111,9 +1110,72 @@ function StudentsTab({
     );
   }
 
+  const renderDeleteModal = () => {
+    if (!isDeleteModalOpen) return null;
+    return createPortal(
+      <div
+        className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm"
+        onClick={(e) => {
+          if (e.target === e.currentTarget && !isDeleting) {
+            setIsDeleteModalOpen(false);
+            setStudentsToDelete([]);
+          }
+        }}
+      >
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative z-[100000] border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                <Trash2 size={24} className="text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Confirm Deletion</h3>
+                <p className="text-sm text-slate-500">This action is permanent and non-reversible.</p>
+              </div>
+            </div>
+
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-5">
+              <p className="text-sm text-rose-800 font-semibold">
+                ⚠️ You are about to permanently delete <span className="font-extrabold">{studentsToDelete.length || 1}</span> student{studentsToDelete.length > 1 ? 's' : ''}.
+              </p>
+              <p className="text-xs text-rose-700 mt-1.5 leading-relaxed">
+                All student data, documents, marksheets, certificates, and photos will be permanently erased from the database and storage.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setStudentsToDelete([]);
+                }}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2.5 border border-slate-200 bg-white rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteStudents(studentsToDelete)}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer shadow-md shadow-rose-600/20"
+              >
+                <Trash2 size={16} /> {isDeleting ? 'Deleting...' : 'Delete Student'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
   if (viewingStudent) {
     return (
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+        {renderDeleteModal()}
+        <SuccessToast show={showSuccessToast} message="Student deleted successfully!" />
         <div className="flex items-center justify-between mb-6 border-b border-slate-200 pb-4">
           <div>
             <button onClick={() => setViewingStudent(null)} className="text-slate-500 hover:text-slate-900 transition-colors flex items-center text-sm font-medium mb-1">
@@ -1217,82 +1279,12 @@ function StudentsTab({
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="relative">
       <Loader show={isLoading || isDeleting} fullScreen={false} />
+      {renderDeleteModal()}
+      <SuccessToast show={showSuccessToast} message="Student deleted successfully!" />
 
-      {/* ── Delete Confirmation Modal ── */}
-      <AnimatePresence>
-        {isDeleteModalOpen && createPortal(
-          <motion.div
-            key="delete-modal-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm"
-          >
-            <motion.div
-              key="delete-modal"
-              initial={{ opacity: 0, scale: 0.92, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 20 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
-            >
-              <div className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
-                    <Trash2 size={22} className="text-rose-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900">Confirm Deletion</h3>
-                    <p className="text-sm text-slate-500">This action is non-reversible.</p>
-                  </div>
-                </div>
-
-                <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-5">
-                  <p className="text-sm text-rose-800 font-medium">
-                    ⚠️ You are about to permanently delete <span className="font-extrabold">{studentsToDelete.length}</span> student{studentsToDelete.length > 1 ? 's' : ''}.
-                  </p>
-                  <p className="text-xs text-rose-700 mt-1">
-                    All student data, uploaded documents, and profile photos will be permanently erased from the database and storage. This cannot be undone.
-                  </p>
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => { setIsDeleteModalOpen(false); setStudentsToDelete([]); }}
-                    className="flex-1 px-4 py-2.5 border border-slate-200 bg-white rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => handleDeleteStudents(studentsToDelete)}
-                    disabled={isDeleting}
-                    className="flex-1 px-4 py-2.5 bg-rose-600 text-white rounded-lg text-sm font-bold hover:bg-rose-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
-                  >
-                    <Trash2 size={16} /> {isDeleting ? 'Deleting...' : 'Delete Anyway'}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>,
-          document.body
-        )}
-      </AnimatePresence>
-      
-      {showDeleteSuccessAnimation && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8">
-          <SuccessAnimation 
-            title="Deletion Successful!"
-            message={`Successfully deleted ${studentsToDelete.length} student${studentsToDelete.length > 1 ? 's' : ''}.`}
-            color="rose"
-          />
-        </div>
-      )}
-
-      {!showDeleteSuccessAnimation && (
-        <>
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-            <h2 className="text-2xl font-bold text-slate-900">Student Management</h2>
-          </div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+        <h2 className="text-2xl font-bold text-slate-900">Student Management</h2>
+      </div>
 
       <div className="bg-white p-4 rounded-xl border border-slate-200 mb-6 shadow-sm">
         <div className="flex flex-col md:flex-row gap-4">
@@ -1483,8 +1475,6 @@ function StudentsTab({
           </table>
         </div>
       </div>
-      </>
-      )}
     </motion.div>
   );
 }
