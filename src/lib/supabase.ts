@@ -661,7 +661,7 @@ export const supabase = {
         if (reqIndex >= 0) {
           const req = mockDB.access_requests[reqIndex];
           mockDB.access_requests[reqIndex] = { ...req, status: 'approved' };
-          
+
           const newUser: User = {
             id: `u-${Date.now()}`,
             name: req.name,
@@ -671,7 +671,7 @@ export const supabase = {
             role: role as any,
             status: 'active'
           };
-          
+
           mockDB.users = mockDB.users.filter(u => u.email.toLowerCase() !== newUser.email.toLowerCase());
           mockDB.users.push(newUser);
           saveDatabase(mockDB);
