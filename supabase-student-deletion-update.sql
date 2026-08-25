@@ -188,27 +188,34 @@ BEGIN
   END;
 END $$;
 
--- 9. Auto Purge Attendance Photos & Database URLs Older Than 24 Hours Strictly
+-- 9. Purge Attendance Photo References Older Than 24 Hours
+-- NOTE: Supabase blocks direct DELETE FROM storage.objects.
+-- This function only clears DB references and returns URLs for client-side Storage API deletion.
+DROP FUNCTION IF EXISTS public.delete_old_attendance_photos() CASCADE;
+
 CREATE OR REPLACE FUNCTION public.delete_old_attendance_photos()
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, storage, pg_temp
+SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_deleted_storage_count INTEGER := 0;
   v_updated_records_count INTEGER := 0;
+  v_old_photo_urls TEXT[];
 BEGIN
-  -- 1. Delete all photo files from attendance_photos bucket created more than 24 hours ago
-  WITH deleted_files AS (
-    DELETE FROM storage.objects 
-    WHERE bucket_id = 'attendance_photos' 
-      AND created_at < NOW() - INTERVAL '24 hours'
-    RETURNING 1
-  )
-  SELECT COUNT(*) INTO v_deleted_storage_count FROM deleted_files;
+  -- Collect old photo URLs so the frontend can delete them via Storage API
+  SELECT ARRAY_AGG(url) INTO v_old_photo_urls
+  FROM (
+    SELECT check_in_photo_url AS url FROM public.attendance_records
+    WHERE created_at < NOW() - INTERVAL '24 hours'
+      AND check_in_photo_url IS NOT NULL
+    UNION ALL
+    SELECT check_out_photo_url AS url FROM public.attendance_records
+    WHERE created_at < NOW() - INTERVAL '24 hours'
+      AND check_out_photo_url IS NOT NULL
+  ) urls;
 
-  -- 2. Clear photo references from attendance_records (retains punch times & status, purges expired photo references)
+  -- Clear photo references from attendance_records (retains punch times & status)
   WITH updated_records AS (
     UPDATE public.attendance_records
     SET check_in_photo_url = NULL,
@@ -221,8 +228,8 @@ BEGIN
 
   RETURN jsonb_build_object(
     'success', true,
-    'deleted_storage_files', v_deleted_storage_count,
     'cleared_records', v_updated_records_count,
+    'photo_urls_to_delete', COALESCE(v_old_photo_urls, ARRAY[]::TEXT[]),
     'timestamp', NOW()
   );
 END;
@@ -230,23 +237,8 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.delete_old_attendance_photos() TO authenticated, anon;
 
--- Auto-trigger 24-hour purge on every attendance punch
-CREATE OR REPLACE FUNCTION public.trigger_purge_old_attendance_photos()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, storage, pg_temp
-AS $$
-BEGIN
-  PERFORM public.delete_old_attendance_photos();
-  RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS trigger_auto_purge_attendance_photos ON public.attendance_records;
-CREATE TRIGGER trigger_auto_purge_attendance_photos
-AFTER INSERT OR UPDATE ON public.attendance_records
-FOR EACH STATEMENT
-EXECUTE FUNCTION public.trigger_purge_old_attendance_photos();
+-- NOTE: The auto-purge trigger has been REMOVED.
+-- Direct DELETE FROM storage.objects is no longer allowed by Supabase.
+-- Photo file cleanup is now handled via the Supabase Storage API in the frontend.
 
 SELECT '✅ Student cascade deletion, storage delete permissions, 24h attendance photo auto-purge, and realtime sync configured successfully!' AS status;

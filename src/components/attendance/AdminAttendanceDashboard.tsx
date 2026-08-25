@@ -188,7 +188,17 @@ export default function AdminAttendanceDashboard({ usersList, currentUser }: Adm
         users: resolveUserForRecord(r)
       }));
       setRecords(formatted as AttendanceRecordWithUser[]);
-      await supabase.rpc('delete_old_attendance_photos');
+      // Purge old attendance photo references & delete files via Storage API
+      try {
+        const { data: purgeResult } = await supabase.rpc('delete_old_attendance_photos');
+        if (purgeResult?.photo_urls_to_delete?.length > 0) {
+          await supabase.storage
+            .from('attendance_photos')
+            .remove(purgeResult.photo_urls_to_delete);
+        }
+      } catch (purgeErr) {
+        console.warn('Photo purge skipped:', purgeErr);
+      }
     } catch (err) {
       console.error(err);
       logError(err, 'fetchAttendanceRecords');
