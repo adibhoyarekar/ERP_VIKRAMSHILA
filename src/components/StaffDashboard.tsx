@@ -148,45 +148,18 @@ export default function StaffDashboard({ user, onLogout, usersList, onSync }: St
           className="flex-1 flex flex-col min-h-0 overflow-hidden w-full max-w-full"
         >
           {activeTab === 'attendance' && (
-            <div className="flex-1 overflow-y-auto pb-20 md:pb-6">
+            <div className="flex-1 overflow-y-auto pb-6">
               <EmployeeAttendanceTab user={user} />
             </div>
           )}
           {activeTab === 'messages' && (
-            <div className="flex-1 min-h-0 w-full p-2 sm:p-4 md:p-6 pb-20 md:pb-6 flex flex-col">
+            <div className="flex-1 min-h-0 w-full p-2 sm:p-4 md:p-6 pb-6 flex flex-col">
               <MessagesTab currentUser={user} usersList={usersList} />
             </div>
           )}
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation Bar (md:hidden) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-4 py-2 flex items-center justify-around shadow-lg pb-safe text-slate-400">
-        <button
-          type="button"
-          onClick={() => setActiveTab('attendance')}
-          className={`flex flex-col items-center justify-center py-1 px-4 rounded-xl transition-all cursor-pointer ${
-            activeTab === 'attendance' ? 'text-sky-400 font-bold' : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Clock size={20} />
-          <span className="text-[10px] mt-0.5">Attendance</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('messages')}
-          className={`flex flex-col items-center justify-center py-1 px-4 rounded-xl transition-all cursor-pointer relative ${
-            activeTab === 'messages' ? 'text-sky-400 font-bold' : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <MessageSquare size={20} />
-          {unreadMsgCount > 0 && (
-            <span className="absolute top-0 right-3 w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
-          )}
-          <span className="text-[10px] mt-0.5">Messages</span>
-        </button>
-      </div>
     </div>
   );
 }
