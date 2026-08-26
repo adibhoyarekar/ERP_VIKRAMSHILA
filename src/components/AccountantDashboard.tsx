@@ -532,7 +532,7 @@ export default function AccountantDashboard({ user, onLogout, usersList, student
       </div>
 
       {/* Mobile Bottom Navigation Bar (md:hidden) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 py-1.5 flex items-center justify-around shadow-lg pb-safe">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 py-1.5 flex items-center justify-around shadow-lg pb-safe">
         <button
           type="button"
           onClick={() => handleTabChange('dashboard')}
