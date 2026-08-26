@@ -255,7 +255,7 @@ export default function ClerkDashboard({ user, onLogout, usersList, students, se
         />
 
         {/* Main Content Area (Full screen width) */}
-        <main ref={mainRef} className="flex-1 p-2 sm:p-4 md:p-8 overflow-y-auto pb-24 md:pb-8 w-full max-w-full overflow-x-hidden">
+        <main ref={mainRef} className="flex-1 p-2 sm:p-4 md:p-8 overflow-y-auto pb-8 w-full max-w-full overflow-x-hidden">
         <div className="w-full">
           <AnimatePresence mode="wait">
             {activeTab === 'dashboard' && <DashboardTab key="dashboard" students={students} stationaryRecords={stationaryRecords} scholarshipRecords={scholarshipRecords} setActiveTab={handleTabChange} />}
@@ -311,72 +311,7 @@ export default function ClerkDashboard({ user, onLogout, usersList, students, se
       </main>
       </div>
 
-      {/* Mobile Bottom Navigation Bar (md:hidden) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 py-1.5 flex items-center justify-around shadow-lg pb-safe">
-        <button
-          type="button"
-          onClick={() => handleTabChange('dashboard')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer min-w-[56px] ${
-            activeTab === 'dashboard' ? 'text-sky-600 font-bold' : 'text-slate-500'
-          }`}
-        >
-          <LayoutDashboard size={20} />
-          <span className="text-[10px] mt-0.5">Overview</span>
-        </button>
 
-        <button
-          type="button"
-          onClick={() => handleTabChange('students')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer min-w-[56px] ${
-            activeTab === 'students' ? 'text-sky-600 font-bold' : 'text-slate-500'
-          }`}
-        >
-          <Users size={20} />
-          <span className="text-[10px] mt-0.5">Students</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabChange('attendance')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer min-w-[56px] ${
-            activeTab === 'attendance' ? 'text-sky-600 font-bold' : 'text-slate-500'
-          }`}
-        >
-          <Clock size={20} />
-          <span className="text-[10px] mt-0.5">Attendance</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabChange('messages')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer min-w-[56px] relative ${
-            activeTab === 'messages' ? 'text-sky-600 font-bold' : 'text-slate-500'
-          }`}
-        >
-          <div className="relative">
-            <MessageSquare size={20} />
-            {unreadMsgCount > 0 && (
-              <span className="absolute -top-1 -right-2 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
-                {unreadMsgCount > 9 ? '9+' : unreadMsgCount}
-              </span>
-            )}
-          </div>
-          <span className="text-[10px] mt-0.5">Chat</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setIsMobileMenuOpen(true)}
-          className="flex flex-col items-center justify-center py-1 px-2 rounded-xl text-slate-500 hover:text-slate-900 transition-all cursor-pointer min-w-[56px]"
-        >
-          <div className="space-y-0.5 w-4 flex flex-col items-center my-0.5">
-            <span className="block h-0.5 w-4 bg-slate-600 rounded"></span>
-            <span className="block h-0.5 w-4 bg-slate-600 rounded"></span>
-            <span className="block h-0.5 w-4 bg-slate-600 rounded"></span>
-          </div>
-          <span className="text-[10px] mt-0.5">Menu</span>
-        </button>
-      </div>
 
       {/* In-App Document Viewer Lightbox Modal */}
       <DocumentViewerModal
